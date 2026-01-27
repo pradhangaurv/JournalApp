@@ -31,7 +31,7 @@
         }
         else
         {
-            <!-- ================= PROFILE ================= -->
+            <!-- PROFILE -->
             <div class="settings-section mb-4">
                 <h3 class="section-title">
                     <i class="fas fa-user"></i> Profile Settings
@@ -60,7 +60,7 @@
                 </EditForm>
             </div>
 
-            <!-- ================= PASSWORD ================= -->
+            <!-- PASSWORD -->
             <div class="settings-section mb-4">
                 <h3 class="section-title">
                     <i class="fas fa-key"></i> Change Password
@@ -85,7 +85,7 @@
                 </button>
             </div>
 
-            <!-- ================= THEME ================= -->
+            <!-- THEME -->
             <div class="settings-section mb-4">
                 <h3 class="section-title">
                     <i class="fas fa-palette"></i> Theme Settings
@@ -113,7 +113,7 @@
                 </div>
             </div>
 
-            <!-- ================= EXPORT PDF ================= -->
+            <!-- EXPORT PDF -->
             <div class="settings-section mb-4">
                 <h3 class="section-title">
                     <i class="fas fa-file-pdf"></i> Export Journal Entries
@@ -140,7 +140,7 @@
                 </div>
             </div>
 
-            <!-- ================= LOGOUT ================= -->
+            <!--  LOGOUT -->
             <div class="settings-section danger-zone">
                 <h3 class="section-title text-danger">
                     <i class="fas fa-sign-out-alt"></i> Account
@@ -191,7 +191,7 @@
 
     private Task LoadCurrentUser()
     {
-        // ✅ Use the logged-in user (do NOT load first user from DB)
+        // Use the logged-in user (do NOT load first user from DB)
         currentUser = AuthService.CurrentUser ?? new User();
         return Task.CompletedTask;
     }
@@ -202,7 +202,7 @@
 
         isUpdating = true;
 
-        // ✅ Update only this user
+        // Update only this user
         await Database.UpdateAsync(currentUser);
 
         // keep AuthService in sync (so dashboard shows correct name etc.)
@@ -290,7 +290,7 @@
 
         try
         {
-            // ✅ Load only entries for this user
+            // Load only entries for this user
             var query = "SELECT * FROM JournalEntries WHERE UserId = ? ORDER BY EntryDate DESC";
             var entries = await Database._dbConnection.QueryAsync<JournalEntry>(query, userId);
 

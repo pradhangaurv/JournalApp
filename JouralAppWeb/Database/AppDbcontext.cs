@@ -42,7 +42,7 @@ namespace JouralAppWeb.Database
             await _dbConnection.CreateTableAsync<User>();
             await _dbConnection.CreateTableAsync<JournalEntry>();
 
-            // ✅ migration: add UserId if old DB exists
+            //  migration: add UserId if old DB exists
             await EnsureJournalEntriesHasUserIdAsync();
 
             _initialized = true;
@@ -99,7 +99,7 @@ namespace JouralAppWeb.Database
             return result.FirstOrDefault();
         }
 
-        // ✅ PRIVATE (per-user) entry queries
+        //  PRIVATE (per-user) entry queries
 
         public async Task<JournalEntry?> GetTodayEntryAsync(int userId)
         {

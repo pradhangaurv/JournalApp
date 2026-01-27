@@ -223,14 +223,14 @@ else
         selectedDate = DateTime.MinValue;
         selectedDayEntries.Clear();
     }
-
+    // for month navigation
     private void GoToPreviousMonth() => currentDate = currentDate.AddMonths(-1);
     private void GoToNextMonth() => currentDate = currentDate.AddMonths(1);
     private void GoToToday() => currentDate = DateTime.Today;
-
+    // For navigation to create a new entry
     private void CreateNewEntry(DateTime date)
         => Navigation.NavigateTo($"/entry?date={date:yyyy-MM-dd}");
-
+    // For navigation to edit an existing entry
     private void GoToEdit(int id)
         => Navigation.NavigateTo($"/editjournal/{id}");
 

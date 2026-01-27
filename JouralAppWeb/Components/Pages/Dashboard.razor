@@ -219,7 +219,7 @@ else
     {
         try
         {
-            // ✅ ONLY this user's entries
+            // ONLY this user's entries
             var query = "SELECT * FROM JournalEntries WHERE UserId = ? ORDER BY EntryDate DESC";
             allEntries = (await Database._dbConnection.QueryAsync<JournalEntry>(query, userId)).ToList();
 

@@ -101,7 +101,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        // ✅ Require login
+        // Require login
         if (!AuthService.IsLoggedIn || AuthService.CurrentUser == null)
         {
             Navigation.NavigateTo("/");
@@ -115,7 +115,7 @@
             var today = DateTime.Today;
             var tomorrow = today.AddDays(1);
 
-            // ✅ Load today's entry for this user only
+            // Load today's entry for this user only
             var query = @"
                 SELECT * FROM JournalEntries
                 WHERE UserId = ?
@@ -166,11 +166,11 @@
     {
         if (firstRender)
         {
-            // ✅ Initialize Quill editor
+            // Initialize Quill editor
             await JS.InvokeVoidAsync("quillEditor.init", EditorId);
             editorReady = true;
 
-            // ✅ Set stored HTML into editor
+            // Set stored HTML into editor
             await JS.InvokeVoidAsync("quillEditor.setHtml", EditorId, journalEntry.Content ?? "");
         }
     }
@@ -183,7 +183,7 @@
             return;
         }
 
-        // ✅ Read HTML from Quill
+        // Read HTML from Quill
         var html = await JS.InvokeAsync<string>("quillEditor.getHtml", EditorId);
         journalEntry.Content = html ?? "";
 
