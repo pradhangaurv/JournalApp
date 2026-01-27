@@ -21,7 +21,7 @@ namespace JouralAppWeb.Services
         {
             var todayEntry = await _db.GetTodayEntryAsync(userId);
 
-            entry.UserId = userId; // ✅ owner
+            entry.UserId = userId; //  owner
             entry.EntryDate = DateTime.Today;
 
             if (todayEntry != null)

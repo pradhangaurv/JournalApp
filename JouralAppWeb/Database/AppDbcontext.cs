@@ -36,17 +36,17 @@ namespace JouralAppWeb.Database
         {
             if (_initialized) return;
 
-            Console.WriteLine("📦 Initializing database...");
+            Console.WriteLine("Initializing database...");
             _dbConnection = new SQLiteAsyncConnection(DatabasePath, Flags);
 
             await _dbConnection.CreateTableAsync<User>();
             await _dbConnection.CreateTableAsync<JournalEntry>();
 
-            // ✅ migration: add UserId if old DB exists
+            //  migration: add UserId if old DB exists
             await EnsureJournalEntriesHasUserIdAsync();
 
             _initialized = true;
-            Console.WriteLine("✅ Database initialized successfully!");
+            Console.WriteLine("Database initialized successfully!");
         }
 
         private async Task EnsureJournalEntriesHasUserIdAsync()
@@ -56,7 +56,7 @@ namespace JouralAppWeb.Database
                 await _dbConnection.ExecuteAsync(
                     "ALTER TABLE JournalEntries ADD COLUMN UserId INTEGER NOT NULL DEFAULT 0"
                 );
-                Console.WriteLine("✓ Added UserId column to JournalEntries");
+                Console.WriteLine("Added UserId column to JournalEntries");
             }
             catch
             {
@@ -99,7 +99,7 @@ namespace JouralAppWeb.Database
             return result.FirstOrDefault();
         }
 
-        // ✅ PRIVATE (per-user) entry queries
+        //  PRIVATE (per-user) entry queries
 
         public async Task<JournalEntry?> GetTodayEntryAsync(int userId)
         {

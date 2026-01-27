@@ -31,7 +31,7 @@ namespace JouralAppWeb.Services
                 throw new InvalidOperationException("Please login first.");
         }
 
-        // ✅ LOGIN
+        // LOGIN
         public async Task<(bool Success, string Message)> LoginAsync(string email, string password)
         {
             try
@@ -56,7 +56,7 @@ namespace JouralAppWeb.Services
             }
         }
 
-        // ✅ REGISTER
+        // REGISTER
         public async Task<(bool Success, string Message)> RegisterAsync(User newUser, string confirmPassword)
         {
             try
@@ -92,7 +92,7 @@ namespace JouralAppWeb.Services
             }
         }
 
-        // ✅ Update profile for the currently logged-in user
+        // Update profile for the currently logged-in user
         public async Task<(bool Success, string Message)> UpdateProfileAsync(string fullName)
         {
             try
@@ -117,7 +117,7 @@ namespace JouralAppWeb.Services
             }
         }
 
-        // ✅ Change password for currently logged-in user
+        // Change password for currently logged-in user
         public async Task<(bool Success, string Message)> ChangePasswordAsync(string currentPassword, string newPassword, string confirmNewPassword)
         {
             try
@@ -155,7 +155,7 @@ namespace JouralAppWeb.Services
             }
         }
 
-        // ✅ LOGOUT
+        // LOGOUT
         public void Logout()
         {
             CurrentUser = null;
