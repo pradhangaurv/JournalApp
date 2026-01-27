@@ -1,0 +1,337 @@
+﻿@page "/dashboard"
+@using JouralAppWeb.Database
+@using System.Linq
+@inject NavigationManager Navigation
+@inject JouralAppWeb.Services.AuthService AuthService
+@inject AppDbContext Database
+
+@if (!isLoggedIn)
+{
+    <p>Please login first.</p>
+}
+else
+{
+    <div class="dashboard-container">
+        <div class="dashboard-header">
+            <h1>Welcome back! Here's your journaling overview.</h1>
+        </div>
+
+        <div class="dashboard-stats">
+            <div class="stat-card">
+                <div class="stat-icon"><i class="fas fa-book"></i></div>
+                <h3>@totalEntries</h3>
+                <p>Total Entries</p>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon"><i class="fas fa-calendar-week"></i></div>
+                <h3>@recentEntries</h3>
+                <p>Last 7 Days</p>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon"><i class="fas fa-fire"></i></div>
+                <h3>@currentStreak</h3>
+                <p>Day Streak</p>
+                @if (currentStreak > 0)
+                {
+                    <small class="text-success">🔥 Keep it up!</small>
+                }
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon"><i class="fas fa-heart"></i></div>
+                <h3>@mostFrequentMood</h3>
+                <p>Top Mood</p>
+            </div>
+        </div>
+
+        <!-- Pie Chart Section -->
+        <div class="pie-chart-section">
+            <h3><i class="fas fa-chart-pie"></i> Mood Distribution</h3>
+            <div class="pie-chart-container">
+                <div class="pie-chart">
+                    <svg width="200" height="200" viewBox="0 0 200 200">
+                        @{
+                            double startAngle = 0;
+                            var colors = new[] { "#4CAF50", "#2196F3", "#FF9800", "#9C27B0", "#F44336", "#FFC107" };
+                            int i = 0;
+                            var topMoods = moodDistribution.OrderByDescending(m => m.Value).Take(6).ToList();
+                        }
+
+                        @foreach (var mood in topMoods)
+                        {
+                            var percentage = totalEntries > 0 ? (double)mood.Value / totalEntries * 100 : 0;
+                            var angle = percentage * 3.6;
+
+                            if (angle > 0)
+                            {
+                                <path d="@CalculateArc(100, 100, 80, startAngle, startAngle + angle)"
+                                      fill="@colors[i % colors.Length]"
+                                      stroke="white"
+                                      stroke-width="2" />
+
+                                startAngle += angle;
+                                i++;
+                            }
+                        }
+
+                        <circle cx="100" cy="100" r="40" fill="white" />
+                        <text x="100" y="105" text-anchor="middle" font-size="20" font-weight="bold" fill="#333">
+                            @totalEntries
+                        </text>
+                        <text x="100" y="125" text-anchor="middle" font-size="12" fill="#666">
+                            Total
+                        </text>
+                    </svg>
+                </div>
+
+                <div class="pie-legend">
+                    @foreach (var mood in moodDistribution.OrderByDescending(m => m.Value))
+                    {
+                        <div class="legend-item">
+                            <span class="legend-color" style="background-color: @GetMoodColor(mood.Key)"></span>
+                            <span class="legend-text">@mood.Key</span>
+                            <span class="legend-count">
+                                @mood.Value (@(totalEntries == 0 ? "0" : ((double)mood.Value / totalEntries * 100).ToString("F0"))%)
+                            </span>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Bar Chart Section -->
+        <div class="bar-chart-section">
+            <h3><i class="fas fa-chart-bar"></i> This Week's Mood</h3>
+            <div class="bar-chart-container">
+                @for (int day = 6; day >= 0; day--)
+                {
+                    var date = DateTime.Now.AddDays(-day);
+                    var dayEntries = allEntries.Where(e => e.EntryDate.Date == date.Date).ToList();
+                    var hasEntries = dayEntries.Any();
+                    var moodScore = hasEntries ? GetAverageMoodScore(dayEntries) : 0;
+                    var barHeight = moodScore * 20;
+
+                    <div class="bar-column" title="@date.ToString("MMM dd")">
+                        <div class="bar-label">@date.ToString("ddd")</div>
+                        <div class="bar" style="height: @(barHeight)px; background-color: @GetMoodColorByScore(moodScore);">
+                            @if (hasEntries)
+                            {
+                                <span class="bar-value">@moodScore</span>
+                            }
+                        </div>
+                        <div class="day-date">@date.ToString("dd")</div>
+                    </div>
+                }
+            </div>
+            <div class="bar-chart-legend">
+                <span class="legend-dot" style="background-color: #4CAF50"></span> Positive
+                <span class="legend-dot" style="background-color: #FFC107"></span> Neutral
+                <span class="legend-dot" style="background-color: #F44336"></span> Negative
+            </div>
+        </div>
+
+        <div class="dashboard-actions">
+            <button @onclick="GoToNewEntry" class="btn btn-primary btn-lg">
+                <i class="fas fa-plus"></i> Write Today's Entry
+            </button>
+            <button @onclick="GoToEntries" class="btn btn-secondary btn-lg">
+                <i class="fas fa-history"></i> View Timeline
+            </button>
+        </div>
+
+        <div class="recent-entries">
+            <h3><i class="fas fa-clock"></i> Recent Entries</h3>
+            @if (recentJournalEntries.Any())
+            {
+                <div class="entries-list">
+                    @foreach (var entry in recentJournalEntries)
+                    {
+                        <div class="entry-card">
+                            <div class="entry-header">
+                                <span class="entry-date">@entry.EntryDate.ToString("MMM dd, yyyy")</span>
+                                <span class="mood-badge" style="background-color: @GetMoodColor(entry.PrimaryMood)">
+                                    @entry.PrimaryMood
+                                </span>
+                            </div>
+                            <p class="entry-preview">@GetPreview(entry.Content)</p>
+
+                            @if (!string.IsNullOrEmpty(entry.Category))
+                            {
+                                <div class="entry-tags">
+                                    <span class="tag"><i class="fas fa-tag"></i> @entry.Category</span>
+                                </div>
+                            }
+
+                            <button @onclick="() => ViewEntry(entry.Id)"
+                                    class="btn btn-sm btn-outline-primary mt-2">
+                                <i class="fas fa-eye"></i> View
+                            </button>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="empty-state">
+                    <i class="fas fa-book-open fa-3x text-muted"></i>
+                    <p>No entries yet. Start your journaling journey!</p>
+                    <button @onclick="GoToNewEntry" class="btn btn-primary mt-3">
+                        <i class="fas fa-plus"></i> Create First Entry
+                    </button>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private bool isLoggedIn = false;
+    private int userId;
+
+    private int totalEntries = 0;
+    private int recentEntries = 0;
+    private int currentStreak = 0;
+    private string mostFrequentMood = "None";
+
+    private List<JournalEntry> allEntries = new();
+    private List<JournalEntry> recentJournalEntries = new();
+    private Dictionary<string, int> moodDistribution = new();
+
+    private readonly List<string> positiveMoods = new() { "Happy", "Calm", "Excited", "Grateful", "Proud" };
+    private readonly List<string> negativeMoods = new() { "Sad", "Stressed", "Angry", "Anxious", "Tired" };
+    private readonly List<string> neutralMoods = new() { "Neutral", "Okay", "Fine", "Meh" };
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!AuthService.IsLoggedIn || AuthService.CurrentUser == null)
+        {
+            isLoggedIn = false;
+            Navigation.NavigateTo("/", true);
+            return;
+        }
+
+        isLoggedIn = true;
+        userId = AuthService.CurrentUser.Id;
+
+        await LoadDashboardData();
+    }
+
+    private async Task LoadDashboardData()
+    {
+        try
+        {
+            // ✅ ONLY this user's entries
+            var query = "SELECT * FROM JournalEntries WHERE UserId = ? ORDER BY EntryDate DESC";
+            allEntries = (await Database._dbConnection.QueryAsync<JournalEntry>(query, userId)).ToList();
+
+            totalEntries = allEntries.Count;
+
+            var oneWeekAgo = DateTime.Now.AddDays(-7);
+            recentEntries = allEntries.Count(e => e.EntryDate >= oneWeekAgo);
+
+            moodDistribution = allEntries
+                .Where(e => !string.IsNullOrEmpty(e.PrimaryMood))
+                .GroupBy(e => e.PrimaryMood)
+                .ToDictionary(g => g.Key, g => g.Count());
+
+            mostFrequentMood = moodDistribution.Any()
+                ? moodDistribution.OrderByDescending(m => m.Value).First().Key
+                : "None";
+
+            CalculateStreak();
+
+            recentJournalEntries = allEntries
+                .OrderByDescending(e => e.EntryDate)
+                .Take(5)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading dashboard: {ex.Message}");
+        }
+    }
+
+    private void CalculateStreak()
+    {
+        if (!allEntries.Any()) return;
+
+        var sortedDates = allEntries
+            .Select(e => e.EntryDate.Date)
+            .Distinct()
+            .OrderByDescending(d => d)
+            .ToList();
+
+        currentStreak = 0;
+        var currentDate = DateTime.Today;
+
+        while (sortedDates.Contains(currentDate))
+        {
+            currentStreak++;
+            currentDate = currentDate.AddDays(-1);
+        }
+    }
+
+    private int GetAverageMoodScore(List<JournalEntry> entries)
+    {
+        if (!entries.Any()) return 0;
+
+        int totalScore = 0;
+        foreach (var entry in entries)
+        {
+            if (positiveMoods.Contains(entry.PrimaryMood)) totalScore += 3;
+            else if (neutralMoods.Contains(entry.PrimaryMood)) totalScore += 2;
+            else if (negativeMoods.Contains(entry.PrimaryMood)) totalScore += 1;
+            else totalScore += 2;
+        }
+
+        return (int)Math.Round((double)totalScore / entries.Count);
+    }
+
+    private string CalculateArc(double cx, double cy, double radius, double startAngle, double endAngle)
+    {
+        var startRad = (startAngle - 90) * Math.PI / 180;
+        var endRad = (endAngle - 90) * Math.PI / 180;
+
+        var x1 = cx + radius * Math.Cos(startRad);
+        var y1 = cy + radius * Math.Sin(startRad);
+        var x2 = cx + radius * Math.Cos(endRad);
+        var y2 = cy + radius * Math.Sin(endRad);
+
+        var largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
+        return $"M {cx} {cy} L {x1} {y1} A {radius} {radius} 0 {largeArcFlag} 1 {x2} {y2} Z";
+    }
+
+    private string GetMoodColor(string mood) => mood switch
+    {
+        "Happy" => "#4CAF50",
+        "Excited" => "#FF9800",
+        "Calm" => "#2196F3",
+        "Grateful" => "#9C27B0",
+        "Proud" => "#FFC107",
+        "Sad" => "#F44336",
+        "Stressed" => "#795548",
+        "Angry" => "#D32F2F",
+        "Anxious" => "#FF5722",
+        "Tired" => "#607D8B",
+        "Neutral" => "#9E9E9E",
+        _ => "#757575"
+    };
+
+    private string GetMoodColorByScore(int score) => score switch
+    {
+        3 => "#4CAF50",
+        2 => "#FFC107",
+        1 => "#F44336",
+        _ => "#E0E0E0"
+    };
+
+    private string GetPreview(string content)
+    {
+        if (string.IsNullOrEmpty(content)) return "No content";
+        var plainText = System.Text.RegularExpressions.Regex.Replace(content, "<.*?>", " ");
+        return plainText.Length > 100 ? plainText.Substring(0, 100) + "..." : plainText;
+    }
+
+    private void GoToNewEntry() => Navigation.NavigateTo("/entry");
+    private void GoToEntries() => Navigation.NavigateTo("/timeline");
+    private void ViewEntry(int id) => Navigation.NavigateTo($"/editjournal/{id}");
+}

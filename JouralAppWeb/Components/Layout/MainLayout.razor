@@ -1,0 +1,51 @@
+﻿@using JouralAppWeb.Services
+@inherits LayoutComponentBase
+@inject NavigationManager Nav
+@inject Theme Theme
+@implements IDisposable
+
+<div class="app @(Theme.CurrentTheme)">
+    <div class="page">
+
+        @if (!IsAuthPage)
+        {
+            <div class="sidebar">
+                <NavMenu />
+            </div>
+        }
+
+        <main>
+            @if (!IsAuthPage)
+            {
+                <div class="top-row px-4"></div>
+            }
+
+            <article class="content px-4">
+                @Body
+            </article>
+        </main>
+
+    </div>
+</div>
+
+@code {
+    bool IsAuthPage
+    {
+        get
+        {
+            var route = Nav.ToBaseRelativePath(Nav.Uri).ToLower();
+            return string.IsNullOrEmpty(route)     // "/"i is for login 
+                || route.StartsWith("register");  // "/register" is for registration
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        Theme.OnThemeChanged += StateHasChanged;
+    }
+
+    public void Dispose()
+    {
+        Theme.OnThemeChanged -= StateHasChanged;
+    }
+}

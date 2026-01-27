@@ -1,0 +1,220 @@
+﻿@page "/editjournal/{id:int}"
+@using JouralAppWeb.Database
+@inject NavigationManager Navigation
+@inject AppDbContext Database
+@inject JouralAppWeb.Services.AuthService AuthService
+@inject IJSRuntime JS
+
+<h3>Edit Journal Entry</h3>
+
+@if (isLoading)
+{
+    <div class="text-center mt-5">
+        <div class="spinner-border text-primary"></div>
+        <p class="mt-2"><em>Loading journal entry...</em></p>
+    </div>
+}
+else if (entryObj == null)
+{
+    <div class="alert alert-warning mt-4">
+        <h4>Entry Not Found</h4>
+        <button class="btn btn-secondary" @onclick="GoBack">Back</button>
+    </div>
+}
+else
+{
+    <EditForm Model="entryObj" OnValidSubmit="UpdateJournal">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <!-- Entry Date -->
+        <div class="mb-3">
+            <label class="form-label">Entry Date</label>
+            <input type="date" class="form-control" @bind="entryObj.EntryDate" @bind:format="yyyy-MM-dd" />
+        </div>
+
+        <!-- QUILL EDITOR -->
+        <div class="mb-3">
+            <label class="form-label">Journal Content</label>
+            <div id="quillEditor" class="border rounded" style="height:260px;background:white;"></div>
+            <small class="text-muted">Word count: @WordCount</small>
+        </div>
+
+        <!-- Category -->
+        <div class="mb-3">
+            <label class="form-label">Category</label>
+            <input class="form-control" @bind="entryObj.Category" />
+        </div>
+
+        <!-- Primary Mood -->
+        <div class="mb-3">
+            <label class="form-label">Primary Mood</label>
+            <select class="form-control" @bind="entryObj.PrimaryMood">
+                <option value="">Select mood</option>
+                @foreach (var mood in AllMoods)
+                {
+                    <option value="@mood">@mood</option>
+                }
+            </select>
+        </div>
+
+        <!-- Secondary Moods -->
+        <div class="mb-3">
+            <label class="form-label">Secondary Moods (max 2)</label>
+            @foreach (var mood in AllMoods)
+            {
+                <div class="form-check">
+                    <input type="checkbox"
+                           class="form-check-input"
+                           checked="@SecondaryMoodList.Contains(mood)"
+                           @onchange="e => ToggleSecondaryMood(mood, (bool)e.Value!)"
+                           disabled="@(SecondaryMoodList.Count >= 2 && !SecondaryMoodList.Contains(mood))" />
+                    <label class="form-check-label">@mood</label>
+                </div>
+            }
+        </div>
+
+        <!-- Tags -->
+        <div class="mb-4">
+            <label class="form-label">Tags</label>
+            <input class="form-control" @bind="TagsInput" placeholder="Work, Study, Family" />
+        </div>
+
+        <!-- Buttons -->
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-success">Update</button>
+            <button type="button" class="btn btn-danger" @onclick="DeleteEntry">Delete</button>
+            <button type="button" class="btn btn-secondary" @onclick="GoBack">Cancel</button>
+        </div>
+    </EditForm>
+}
+
+@code {
+    [Parameter] public int id { get; set; }
+
+    private JournalEntry? entryObj;
+    private bool isLoading = true;
+    private int userId;
+    private const string QuillId = "quillEditor";
+    private bool quillReady = false;
+
+    private string TagsInput = "";
+    private List<string> SecondaryMoodList = new();
+
+    private readonly List<string> AllMoods = new()
+    {
+        "Happy","Calm","Excited","Grateful",
+        "Sad","Stressed","Angry","Anxious",
+        "Tired","Motivated","Lonely","Relaxed"
+    };
+
+    private int WordCount =>
+        string.IsNullOrWhiteSpace(entryObj?.Content) ? 0 :
+        StripHtml(entryObj.Content)
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Length;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!AuthService.IsLoggedIn || AuthService.CurrentUser == null)
+        {
+            Navigation.NavigateTo("/");
+            return;
+        }
+
+        userId = AuthService.CurrentUser.Id;
+        await LoadJournal();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && entryObj != null && !quillReady)
+        {
+            await JS.InvokeVoidAsync("quillEditor.init", QuillId);
+            await JS.InvokeVoidAsync("quillEditor.setHtml", QuillId, entryObj.Content ?? "");
+            quillReady = true;
+        }
+    }
+
+    private async Task LoadJournal()
+    {
+        var sql = "SELECT * FROM JournalEntries WHERE Id=? AND UserId=? LIMIT 1";
+        var result = await Database._dbConnection.QueryAsync<JournalEntry>(sql, id, userId);
+        entryObj = result.FirstOrDefault();
+
+        if (entryObj != null)
+        {
+            SecondaryMoodList = string.IsNullOrWhiteSpace(entryObj.SecondaryMoods) 
+                ? new() 
+                : entryObj.SecondaryMoods.Split(',').Select(m => m.Trim()).ToList();
+
+            TagsInput = entryObj.Tags ?? "";
+        }
+
+        isLoading = false;
+    }
+
+    private async Task UpdateJournal()
+    {
+        if (entryObj == null) return;
+
+        entryObj.Content = await JS.InvokeAsync<string>("quillEditor.getHtml", QuillId) ?? "";
+
+        if (string.IsNullOrWhiteSpace(StripHtml(entryObj.Content)))
+        {
+            await Application.Current.MainPage.DisplayAlert(
+                "Validation Error",
+                "Journal entry cannot be empty.",
+                "OK");
+            return;
+        }
+
+        entryObj.SecondaryMoods = string.Join(",", SecondaryMoodList);
+        entryObj.Tags = TagsInput;
+        entryObj.UpdatedAt = DateTime.Now;
+        entryObj.UserId = userId;
+
+        var sql = @"
+            UPDATE JournalEntries
+            SET Content=?, Category=?, PrimaryMood=?, SecondaryMoods=?, Tags=?, EntryDate=?, UpdatedAt=?
+            WHERE Id=? AND UserId=?";
+
+        await Database._dbConnection.ExecuteAsync(
+            sql,
+            entryObj.Content,
+            entryObj.Category,
+            entryObj.PrimaryMood,
+            entryObj.SecondaryMoods,
+            entryObj.Tags,
+            entryObj.EntryDate,
+            entryObj.UpdatedAt,
+            entryObj.Id,
+            userId
+        );
+
+        Navigation.NavigateTo("/timeline");
+    }
+
+    private void ToggleSecondaryMood(string mood, bool selected)
+    {
+        if (selected && SecondaryMoodList.Count < 2 && !SecondaryMoodList.Contains(mood))
+            SecondaryMoodList.Add(mood);
+        else
+            SecondaryMoodList.Remove(mood);
+    }
+
+    private async Task DeleteEntry()
+    {
+        await Database._dbConnection.ExecuteAsync(
+            "DELETE FROM JournalEntries WHERE Id=? AND UserId?",
+            entryObj!.Id, userId
+        );
+
+        Navigation.NavigateTo("/timeline");
+    }
+
+    private void GoBack() => Navigation.NavigateTo("/timeline");
+
+    private static string StripHtml(string html) =>
+        System.Text.RegularExpressions.Regex.Replace(html, "<.*?>", " ").Trim();
+}

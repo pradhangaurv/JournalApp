@@ -1,0 +1,84 @@
+﻿@page "/editinfo/{id:int}"
+@using JouralAppWeb.Database
+
+<h3>Edit</h3>
+<div class = "row">
+	<div class ="col-md-12">
+		<EditForm  MOdel="infoObj" OnValidSubmit="UpdateInfomation" FromName="Edit">
+			<DataAnnotationsValidator/>
+			<ValidationSummary/>
+			<div class="col=md-12">
+				<div class="row">
+					<div class= "col-md-6">
+						<div class ="form-gruop">
+							<label class="control-lable">FullName</label>
+							<InputText for ="FullName"class="from-control" @bind-Value="@infoObj.FullName"></InputText>
+							<ValidationMessage For ="()=>infoObj.FullName"/>
+						</div>
+					</div>
+
+					<div class= "col-md-6">
+						<div class ="form-gruop">
+							<label class="control-lable">Password</label>
+							<InputText for ="Password"class="from-control" @bind-Value="@infoObj.Password"></InputText>
+							<ValidationMessage For ="()=>infoObj.Password"/>
+						</div>
+
+					<div class= "col-md-6">
+						<div class ="form-gruop">
+							<label class="control-lable">Email</label>
+							<InputText for ="Email"class="from-control" @bind-Value="@infoObj.Email"></InputText>
+							<ValidationMessage For ="()=>infoObj.Email"/>
+						</div>
+					</div>
+				</div>
+				<div class="form-group mt-4">
+					<button type="submit" class="btn btn-primary"> Update infomation </button>
+				</div>
+			</div>
+		</div>
+		</EditForm>
+
+	</div>
+
+</div>
+@code {
+
+
+	[SupplyParameterFromForm]
+	public User infoObj { get; set; } = new();
+
+	[Parameter]
+	public int id{ get; set; }
+
+
+	protected override async Task OnInitializedAsync()
+	{
+		await Task.Delay(500);
+		LoadInformation();
+
+	}
+
+	public async Task LoadInformation()
+	{
+	}
+	
+
+	protected async Task UpdateInfomation()
+	{
+		var result = await App.Database.UpdateAsync<User>(infoObj);
+		if (result >0){
+			await App.Current.MainPage.DisplayAlert
+			("Sucess",
+			"Updated",
+			"Ok");
+		}
+		else
+		{
+			await App.Current.MainPage.DisplayAlert
+			("Failed",
+			"Not Updated",
+			"Ok");
+		}
+	}
+}

@@ -1,0 +1,185 @@
+﻿@page "/timeline"
+@using JouralAppWeb.Database
+@inject NavigationManager Navigation
+@inject AppDbContext Database
+@inject JouralAppWeb.Services.AuthService AuthService
+
+<h1>Journal Entries</h1>
+
+@if (!isLoggedIn)
+{
+    <div class="alert alert-warning">Please login first.</div>
+}
+else
+{
+    <!-- 🔍 FILTER BAR -->
+    <div class="card mb-4 shadow-sm">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Search content</label>
+                    <input class="form-control"
+                           placeholder="Search journal text..."
+                           @bind="SearchText"
+                           @bind:event="oninput" />
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label">From</label>
+                    <input type="date" class="form-control" @bind="FromDate" />
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label">To</label>
+                    <input type="date" class="form-control" @bind="ToDate" />
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label">Mood</label>
+                    <select class="form-control" @bind="SelectedMood">
+                        <option value="">All</option>
+                        @foreach (var mood in AllMoods)
+                        {
+                            <option value="@mood">@mood</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label">Tag</label>
+                    <input class="form-control"
+                           placeholder="e.g. Work"
+                           @bind="TagFilter"
+                           @bind:event="oninput" />
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (FilteredEntries.Count == 0)
+    {
+        <div class="alert alert-info text-center">
+            No entries match your filters.
+        </div>
+    }
+    else
+    {
+        <div class="row">
+            @foreach (var entry in FilteredEntries)
+            {
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card journal-card h-100 shadow-sm">
+
+                        <div class="card-header bg-light d-flex justify-content-between">
+                            <strong>@entry.EntryDate.ToString("MMM dd, yyyy")</strong>
+                            <span class="badge bg-primary">@entry.PrimaryMood</span>
+                        </div>
+
+                        <div class="card-body">
+                            <p>
+                                @StripHtml(entry.Content).Substring(0,
+                                Math.Min(150, StripHtml(entry.Content).Length))...
+                </p>
+
+                @if (!string.IsNullOrWhiteSpace(entry.Tags))
+                            {
+                                <div class="mt-2">
+                                    @foreach (var tag in entry.Tags.Split(','))
+                                    {
+                                        <span class="badge bg-secondary me-1">@tag.Trim()</span>
+                                    }
+                                </div>
+                            }
+                        </div>
+
+                        <div class="card-footer d-flex justify-content-between">
+                            <button class="btn btn-sm btn-primary" @onclick="() => GoToEdit(entry.Id)">Edit</button>
+                            <button class="btn btn-sm btn-danger" @onclick="() => DeleteEntry(entry)">Delete</button>
+                        </div>
+
+                    </div>
+                </div>
+            }
+        </div>
+    }
+}
+
+@code {
+    private bool isLoggedIn = false;
+    private int userId;
+
+    private List<JournalEntry> entries = new();
+
+    private string SearchText = "";
+    private string SelectedMood = "";
+    private string TagFilter = "";
+    private DateTime? FromDate;
+    private DateTime? ToDate;
+
+    private readonly List<string> AllMoods = new()
+    {
+        "Happy","Calm","Excited","Grateful","Sad","Stressed","Angry","Anxious"
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!AuthService.IsLoggedIn || AuthService.CurrentUser == null)
+        {
+            isLoggedIn = false;
+            Navigation.NavigateTo("/", true);
+            return;
+        }
+
+        isLoggedIn = true;
+        userId = AuthService.CurrentUser.Id;
+
+        await LoadEntries();
+    }
+
+    private async Task LoadEntries()
+    {
+        // ✅ ONLY this user's entries
+        var query = "SELECT * FROM JournalEntries WHERE UserId = ? ORDER BY EntryDate DESC";
+        var result = await Database._dbConnection.QueryAsync<JournalEntry>(query, userId);
+        entries = result.ToList();
+    }
+
+    private List<JournalEntry> FilteredEntries =>
+        entries
+            .Where(e =>
+                (string.IsNullOrWhiteSpace(SearchText) ||
+                 StripHtml(e.Content).Contains(SearchText, StringComparison.OrdinalIgnoreCase)) &&
+                (!FromDate.HasValue || e.EntryDate.Date >= FromDate.Value.Date) &&
+                (!ToDate.HasValue || e.EntryDate.Date <= ToDate.Value.Date) &&
+                (string.IsNullOrWhiteSpace(SelectedMood) ||
+                 e.PrimaryMood == SelectedMood ||
+                 (e.SecondaryMoods?.Contains(SelectedMood) ?? false)) &&
+                (string.IsNullOrWhiteSpace(TagFilter) ||
+                 (e.Tags?.Contains(TagFilter, StringComparison.OrdinalIgnoreCase) ?? false))
+            )
+            .OrderByDescending(e => e.EntryDate)
+            .ToList();
+
+    private static string StripHtml(string? html)
+    {
+        if (string.IsNullOrWhiteSpace(html)) return "";
+        return System.Text.RegularExpressions.Regex.Replace(html, "<.*?>", "");
+    }
+
+    private void GoToEdit(int id) => Navigation.NavigateTo($"/editjournal/{id}");
+
+    private async Task DeleteEntry(JournalEntry entry)
+    {
+        var ok = await Application.Current.MainPage.DisplayAlert(
+            "Delete Entry",
+            "Are you sure?",
+            "Delete",
+            "Cancel");
+
+        if (!ok) return;
+
+        // entry list already filtered by userId, so this deletes only their own entry
+        await Database._dbConnection.DeleteAsync(entry);
+        entries.Remove(entry);
+    }
+}

@@ -1,0 +1,348 @@
+﻿@page "/settings"
+
+@using JouralAppWeb.Database
+@using JouralAppWeb.Services
+@using QuestPDF.Fluent
+@inject NavigationManager Navigation
+@inject JouralAppWeb.Services.Theme Theme
+@inject JouralAppWeb.Services.AuthService AuthService
+@inject AppDbContext Database
+
+<div class="settings-container">
+
+    <!-- HEADER -->
+    <div class="settings-header d-flex justify-content-between align-items-center mb-4">
+        <h1 class="settings-title">
+            <i class="fas fa-cog"></i> Settings
+        </h1>
+
+        <button class="btn btn-outline-secondary" @onclick="GoBack">
+            <i class="fas fa-arrow-left"></i> Back
+        </button>
+    </div>
+
+    <div class="settings-content">
+
+        @if (!isLoggedIn)
+        {
+            <div class="alert alert-warning">
+                Please login first.
+            </div>
+        }
+        else
+        {
+            <!-- ================= PROFILE ================= -->
+            <div class="settings-section mb-4">
+                <h3 class="section-title">
+                    <i class="fas fa-user"></i> Profile Settings
+                </h3>
+
+                <EditForm Model="currentUser" OnValidSubmit="UpdateProfile">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary class="text-danger" />
+
+                    <div class="mb-2">
+                        <label>Full Name</label>
+                        <InputText class="form-control"
+                                   @bind-Value="currentUser.FullName" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label>Email</label>
+                        <InputText class="form-control"
+                                   @bind-Value="currentUser.Email"
+                                   disabled />
+                    </div>
+
+                    <button class="btn btn-primary" type="submit" disabled="@isUpdating">
+                        @(isUpdating ? "Updating..." : "Update Profile")
+                    </button>
+                </EditForm>
+            </div>
+
+            <!-- ================= PASSWORD ================= -->
+            <div class="settings-section mb-4">
+                <h3 class="section-title">
+                    <i class="fas fa-key"></i> Change Password
+                </h3>
+
+                <InputText type="password" class="form-control mb-2"
+                           placeholder="Current password"
+                           @bind-Value="currentPassword" />
+
+                <InputText type="password" class="form-control mb-2"
+                           placeholder="New password"
+                           @bind-Value="newPassword" />
+
+                <InputText type="password" class="form-control mb-3"
+                           placeholder="Confirm new password"
+                           @bind-Value="confirmNewPassword" />
+
+                <button class="btn btn-warning"
+                        disabled="@isChangingPassword"
+                        @onclick="ChangePassword">
+                    @(isChangingPassword ? "Changing..." : "Change Password")
+                </button>
+            </div>
+
+            <!-- ================= THEME ================= -->
+            <div class="settings-section mb-4">
+                <h3 class="section-title">
+                    <i class="fas fa-palette"></i> Theme Settings
+                </h3>
+
+                <div class="d-flex gap-3">
+                    <div class="form-check theme-option @(Theme.CurrentTheme == "light" ? "selected" : "")"
+                         @onclick="@(() => Theme.SetTheme("light"))">
+                        <i class="fas fa-sun"></i> Light Mode
+                    </div>
+
+                    <div class="form-check theme-option @(Theme.CurrentTheme == "dark" ? "selected" : "")"
+                         @onclick="@(() => Theme.SetTheme("dark"))">
+                        <i class="fas fa-moon"></i> Dark Mode
+                    </div>
+                </div>
+
+                <div class="mt-3">
+                    <button class="btn btn-primary" @onclick="ApplyTheme">
+                        Apply Theme
+                    </button>
+                    <button class="btn btn-outline-secondary ms-2" @onclick="ResetTheme">
+                        Reset
+                    </button>
+                </div>
+            </div>
+
+            <!-- ================= EXPORT PDF ================= -->
+            <div class="settings-section mb-4">
+                <h3 class="section-title">
+                    <i class="fas fa-file-pdf"></i> Export Journal Entries
+                </h3>
+
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label>From Date</label>
+                        <input type="date" class="form-control" @bind="fromDate" />
+                    </div>
+
+                    <div class="col-md-4">
+                        <label>To Date</label>
+                        <input type="date" class="form-control" @bind="toDate" />
+                    </div>
+
+                    <div class="col-md-4 d-flex align-items-end">
+                        <button class="btn btn-success w-100"
+                                disabled="@isExporting"
+                                @onclick="ExportPdf">
+                            @(isExporting ? "Exporting..." : "Export PDF")
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= LOGOUT ================= -->
+            <div class="settings-section danger-zone">
+                <h3 class="section-title text-danger">
+                    <i class="fas fa-sign-out-alt"></i> Account
+                </h3>
+
+                <button class="btn btn-danger" @onclick="Logout">
+                    Logout
+                </button>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+
+    private bool isLoggedIn = false;
+    private int userId;
+
+    // USER
+    private User currentUser = new();
+    private bool isUpdating;
+
+    // PASSWORD
+    private string currentPassword = "";
+    private string newPassword = "";
+    private string confirmNewPassword = "";
+    private bool isChangingPassword;
+
+    // EXPORT
+    private DateTime? fromDate;
+    private DateTime? toDate;
+    private bool isExporting;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!AuthService.IsLoggedIn || AuthService.CurrentUser == null)
+        {
+            isLoggedIn = false;
+            Navigation.NavigateTo("/");
+            return;
+        }
+
+        isLoggedIn = true;
+        userId = AuthService.CurrentUser.Id;
+
+        await LoadCurrentUser();
+    }
+
+    private Task LoadCurrentUser()
+    {
+        // ✅ Use the logged-in user (do NOT load first user from DB)
+        currentUser = AuthService.CurrentUser ?? new User();
+        return Task.CompletedTask;
+    }
+
+    private async Task UpdateProfile()
+    {
+        if (!isLoggedIn) return;
+
+        isUpdating = true;
+
+        // ✅ Update only this user
+        await Database.UpdateAsync(currentUser);
+
+        // keep AuthService in sync (so dashboard shows correct name etc.)
+        AuthService.CurrentUser!.FullName = currentUser.FullName;
+
+        isUpdating = false;
+
+        await Application.Current.MainPage.DisplayAlert(
+            "Success", "Profile updated", "OK");
+    }
+
+    private async Task ChangePassword()
+    {
+        if (!isLoggedIn) return;
+
+        if (string.IsNullOrWhiteSpace(currentPassword) ||
+            string.IsNullOrWhiteSpace(newPassword) ||
+            string.IsNullOrWhiteSpace(confirmNewPassword))
+        {
+            await Application.Current.MainPage.DisplayAlert(
+                "Error", "Please fill all password fields.", "OK");
+            return;
+        }
+
+        if (currentUser.Password != currentPassword)
+        {
+            await Application.Current.MainPage.DisplayAlert(
+                "Error", "Current password is incorrect.", "OK");
+            return;
+        }
+
+        if (newPassword != confirmNewPassword)
+        {
+            await Application.Current.MainPage.DisplayAlert(
+                "Error", "Passwords do not match", "OK");
+            return;
+        }
+
+        if (newPassword.Length < 6)
+        {
+            await Application.Current.MainPage.DisplayAlert(
+                "Error", "Password must be at least 6 characters.", "OK");
+            return;
+        }
+
+        isChangingPassword = true;
+
+        currentUser.Password = newPassword;
+        await Database.UpdateAsync(currentUser);
+
+        // keep AuthService in sync
+        AuthService.CurrentUser!.Password = newPassword;
+
+        isChangingPassword = false;
+
+        currentPassword = "";
+        newPassword = "";
+        confirmNewPassword = "";
+
+        await Application.Current.MainPage.DisplayAlert(
+            "Success", "Password changed", "OK");
+    }
+
+    // THEME
+    private async Task ApplyTheme()
+    {
+        await Application.Current.MainPage.DisplayAlert(
+            "Theme Applied",
+            $"Current theme: {Theme.CurrentTheme}",
+            "OK");
+    }
+
+    private async Task ResetTheme()
+    {
+        Theme.Reset();
+        await ApplyTheme();
+    }
+
+    // EXPORT PDF (ONLY THIS USER)
+    private async Task ExportPdf()
+    {
+        if (!isLoggedIn) return;
+
+        isExporting = true;
+
+        try
+        {
+            // ✅ Load only entries for this user
+            var query = "SELECT * FROM JournalEntries WHERE UserId = ? ORDER BY EntryDate DESC";
+            var entries = await Database._dbConnection.QueryAsync<JournalEntry>(query, userId);
+
+            var filtered = entries
+                .Where(e =>
+                    (!fromDate.HasValue || e.EntryDate.Date >= fromDate.Value.Date) &&
+                    (!toDate.HasValue || e.EntryDate.Date <= toDate.Value.Date))
+                .OrderByDescending(e => e.EntryDate)
+                .ToList();
+
+            if (filtered.Count == 0)
+            {
+                await Application.Current.MainPage.DisplayAlert(
+                    "No Data",
+                    "No entries found for selected date range",
+                    "OK");
+                return;
+            }
+
+            var fileName = $"Journal_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
+            var filePath = Path.Combine(FileSystem.AppDataDirectory, fileName);
+
+            var document = new SavePdf(filtered);
+            document.GeneratePdf(filePath);
+
+            await Application.Current.MainPage.DisplayAlert(
+                "Export Successful",
+                $"PDF saved to:\n{filePath}",
+                "OK");
+        }
+        catch (Exception ex)
+        {
+            await Application.Current.MainPage.DisplayAlert(
+                "Error",
+                $"Export failed: {ex.Message}",
+                "OK");
+        }
+        finally
+        {
+            isExporting = false;
+        }
+    }
+
+    // NAVIGATION
+    private void Logout()
+    {
+        AuthService.Logout();            // ✅ clear current session
+        Navigation.NavigateTo("/");      // ✅ no force reload
+    }
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/dashboard");
+    }
+}

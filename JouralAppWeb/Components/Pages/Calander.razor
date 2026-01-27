@@ -1,0 +1,259 @@
+﻿@page "/calendar"
+@using JouralAppWeb.Database
+@using JouralAppWeb.Services
+@inject NavigationManager Navigation
+@inject AppDbContext Database
+@inject AuthService AuthService
+
+@if (!isLoggedIn)
+{
+    <div class="alert alert-warning">Please login first.</div>
+}
+else
+{
+    <div class="calendar-container @(isDarkMode ? "dark-mode" : "")">
+
+        <!-- HEADER -->
+        <div class="calendar-header">
+            <h1 class="calendar-title">
+                <i class="fas fa-calendar-alt"></i> My Journal Calendar
+            </h1>
+            <div class="calendar-actions">
+                <button class="btn btn-outline-secondary" @onclick="GoToPreviousMonth">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+
+                <span class="current-month">
+                    @currentDate.ToString("MMMM yyyy")
+                </span>
+
+                <button class="btn btn-outline-secondary" @onclick="GoToNextMonth">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+
+                <button class="btn btn-primary" @onclick="GoToToday">Today</button>
+            </div>
+        </div>
+
+        <!--STATS -->
+        <div class="calendar-stats">
+            <div class="stat-card">
+                <h3>@totalEntries</h3>
+                <p>Total Entries</p>
+            </div>
+            <div class="stat-card">
+                <h3>@currentMonthEntries</h3>
+                <p>This Month</p>
+            </div>
+            <div class="stat-card">
+                <h3>@streakDays</h3>
+                <p>Day Streak</p>
+            </div>
+        </div>
+
+        <!-- WEEK DAYS -->
+        <div class="calendar-weekdays">
+            @foreach (var day in weekDays)
+            {
+                <div class="weekday">@day</div>
+            }
+        </div>
+
+        <!-- DAYS GRID -->
+        <div class="calendar-days">
+            @for (int i = 0; i < firstDayOfMonth; i++)
+            {
+                <div class="calendar-day empty"></div>
+            }
+
+            @for (int day = 1; day <= daysInMonth; day++)
+            {
+                var date = new DateTime(currentDate.Year, currentDate.Month, day);
+                var hasEntry = journalEntries.Any(e => e.EntryDate.Date == date.Date);
+                var count = journalEntries.Count(e => e.EntryDate.Date == date.Date);
+                var isToday = date.Date == DateTime.Today;
+
+                <div class="calendar-day @(hasEntry ? "has-entry" : "") @(isToday ? "today" : "")"
+                     @onclick="() => ViewDayEntries(date)">
+                    <div class="day-number">@day</div>
+
+                    @if (hasEntry)
+                    {
+                        <div class="entry-indicator">
+                            <i class="fas fa-pen"></i>
+                            @if (count > 1)
+                            {
+                                <span class="entry-count">@count</span>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        <!-- DAY ENTRIES -->
+        @if (selectedDayEntries.Any())
+        {
+            <div class="day-entries">
+                <h3>
+                    Entries for @selectedDate.ToString("MMMM dd, yyyy")
+                    <button class="btn btn-sm btn-outline-secondary float-end"
+                            @onclick="ClearSelection">
+                        ✕
+                    </button>
+                </h3>
+
+                @foreach (var entry in selectedDayEntries)
+                {
+                    <div class="entry-card">
+                        <small>@entry.CreatedAt.ToString("hh:mm tt")</small>
+                        <span class="badge bg-primary">@entry.PrimaryMood</span>
+
+                        <p>@StripHtml(entry.Content)</p>
+
+                        @if (!string.IsNullOrWhiteSpace(entry.Tags))
+                        {
+                            <div class="tags">
+                                @foreach (var tag in entry.Tags.Split(','))
+                                {
+                                    <span class="badge bg-secondary">@tag.Trim()</span>
+                                }
+                            </div>
+                        }
+
+                        <div class="entry-actions mt-2">
+                            <button class="btn btn-sm btn-primary"
+                                    @onclick="() => GoToEdit(entry.Id)">
+                                Edit
+                            </button>
+
+                            <button class="btn btn-sm btn-danger"
+                                    @onclick="() => DeleteEntry(entry)">
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                }
+
+                <button class="btn btn-success mt-3"
+                        @onclick="() => CreateNewEntry(selectedDate)">
+                    + Add Entry
+                </button>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private bool isLoggedIn = false;
+    private int userId;
+
+    private DateTime currentDate = DateTime.Today;
+    private DateTime selectedDate = DateTime.MinValue;
+
+    private List<JournalEntry> journalEntries = new();
+    private List<JournalEntry> selectedDayEntries = new();
+
+    private int totalEntries;
+    private int currentMonthEntries;
+    private int streakDays;
+
+    private bool isDarkMode = false;
+
+    private readonly string[] weekDays = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
+
+    private int daysInMonth => DateTime.DaysInMonth(currentDate.Year, currentDate.Month);
+    private int firstDayOfMonth => (int)new DateTime(currentDate.Year, currentDate.Month, 1).DayOfWeek;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!AuthService.IsLoggedIn || AuthService.CurrentUser == null)
+        {
+            isLoggedIn = false;
+            Navigation.NavigateTo("/", true);
+            return;
+        }
+
+        isLoggedIn = true;
+        userId = AuthService.CurrentUser.Id;
+
+        await LoadEntries();
+    }
+
+    private async Task LoadEntries()
+    {
+        var query = @"
+            SELECT * FROM JournalEntries
+            WHERE UserId = ?
+            ORDER BY EntryDate DESC";
+
+        var result = await Database._dbConnection.QueryAsync<JournalEntry>(query, userId);
+        journalEntries = result.ToList();
+
+        CalculateStats();
+    }
+
+    private void CalculateStats()
+    {
+        totalEntries = journalEntries.Count;
+
+        currentMonthEntries = journalEntries.Count(e =>
+            e.EntryDate.Month == currentDate.Month &&
+            e.EntryDate.Year == currentDate.Year);
+
+        streakDays = journalEntries
+            .Select(e => e.EntryDate.Date)
+            .Distinct()
+            .OrderByDescending(d => d)
+            .TakeWhile((d, i) => d == DateTime.Today.AddDays(-i))
+            .Count();
+    }
+
+    private void ViewDayEntries(DateTime date)
+    {
+        selectedDate = date;
+        selectedDayEntries = journalEntries
+            .Where(e => e.EntryDate.Date == date.Date)
+            .OrderBy(e => e.CreatedAt)
+            .ToList();
+    }
+
+    private void ClearSelection()
+    {
+        selectedDate = DateTime.MinValue;
+        selectedDayEntries.Clear();
+    }
+
+    private void GoToPreviousMonth() => currentDate = currentDate.AddMonths(-1);
+    private void GoToNextMonth() => currentDate = currentDate.AddMonths(1);
+    private void GoToToday() => currentDate = DateTime.Today;
+
+    private void CreateNewEntry(DateTime date)
+        => Navigation.NavigateTo($"/entry?date={date:yyyy-MM-dd}");
+
+    private void GoToEdit(int id)
+        => Navigation.NavigateTo($"/editjournal/{id}");
+
+    private async Task DeleteEntry(JournalEntry entry)
+    {
+        var ok = await Application.Current.MainPage.DisplayAlert(
+            "Delete Entry",
+            "Are you sure?",
+            "Delete",
+            "Cancel");
+
+        if (!ok) return;
+
+        await Database._dbConnection.DeleteAsync(entry);
+        journalEntries.Remove(entry);
+        selectedDayEntries.Remove(entry);
+
+        CalculateStats();
+    }
+
+    private static string StripHtml(string? html)
+    {
+        if (string.IsNullOrWhiteSpace(html)) return "";
+        return System.Text.RegularExpressions.Regex.Replace(html, "<.*?>", "");
+    }
+}

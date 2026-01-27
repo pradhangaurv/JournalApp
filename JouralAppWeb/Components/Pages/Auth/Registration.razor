@@ -1,0 +1,104 @@
+﻿@page "/register"
+@using JouralAppWeb.Database
+@inject NavigationManager Navigation
+@inject JouralAppWeb.Services.AuthService AuthService
+
+<div class="auth-container">
+    <div class="auth-card">
+        <h2 class="auth-title">Create Account</h2>
+        <p class="auth-subtitle">Join our journal community</p>
+
+        <EditForm Model="newUser" OnValidSubmit="RegisterUser">
+            <DataAnnotationsValidator />
+            <ValidationSummary class="text-danger" />
+
+            <div class="form-group">
+                <label>Full Name</label>
+                <InputText class="form-control"
+                           placeholder="Enter your full name"
+                           @bind-Value="newUser.FullName" />
+            </div>
+
+            <div class="form-group">
+                <label>Email</label>
+                <InputText class="form-control"
+                           placeholder="Enter your email"
+                           @bind-Value="newUser.Email" />
+            </div>
+
+            <div class="form-group">
+                <label>Password</label>
+                <InputText type="password"
+                           class="form-control"
+                           placeholder="Create a password"
+                           @bind-Value="newUser.Password" />
+            </div>
+
+            <div class="form-group">
+                <label>Confirm Password</label>
+                <InputText type="password"
+                           class="form-control"
+                           placeholder="Confirm password"
+                           @bind-Value="confirmPassword" />
+
+                @if (!string.IsNullOrEmpty(confirmPassword) &&
+                                newUser.Password != confirmPassword)
+                {
+                    <small class="text-danger">Passwords do not match</small>
+                }
+            </div>
+
+            <button type="submit"
+                    class="btn btn-primary btn-block"
+                    disabled="@isLoading">
+                @(isLoading ? "Creating Account..." : "Register")
+            </button>
+
+            <div class="auth-footer mt-3">
+                <p>
+                    Already have an account?
+                    <a @onclick="GoToLogin">Login here</a>
+                </p>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    private User newUser = new();
+    private string confirmPassword = "";
+    private bool isLoading = false;
+
+    private async Task RegisterUser()
+    {
+        isLoading = true;
+
+        var result = await AuthService.RegisterAsync(
+            newUser,
+            confirmPassword);
+
+        isLoading = false;
+
+        if (!result.Success)
+        {
+            await Application.Current.MainPage.DisplayAlert(
+                "Registration Failed",
+                result.Message,
+                "OK");
+            return;
+        }
+
+        await Application.Current.MainPage.DisplayAlert(
+            "Success",
+            result.Message,
+            "OK");
+
+        // ✅ no force reload
+        Navigation.NavigateTo("/");
+    }
+
+    private void GoToLogin()
+    {
+        Navigation.NavigateTo("/");
+    }
+}
