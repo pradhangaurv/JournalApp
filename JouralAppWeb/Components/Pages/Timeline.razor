@@ -23,7 +23,7 @@ else
                            @bind="SearchText"
                            @bind:event="oninput" />
                 </div>
-
+                <!-- Search -->
                 <div class="col-md-2">
                     <label class="form-label">From</label>
                     <input type="date" class="form-control" @bind="FromDate" />
@@ -55,7 +55,7 @@ else
             </div>
         </div>
     </div>
-
+    // FILTER BAR END
     @if (FilteredEntries.Count == 0)
     {
         <div class="alert alert-info text-center">
@@ -115,12 +115,12 @@ else
     private string TagFilter = "";
     private DateTime? FromDate;
     private DateTime? ToDate;
-
+    // All possible moods
     private readonly List<string> AllMoods = new()
     {
         "Happy","Calm","Excited","Grateful","Sad","Stressed","Angry","Anxious"
     };
-
+    // On component initialization, check auth and load entries
     protected override async Task OnInitializedAsync()
     {
         if (!AuthService.IsLoggedIn || AuthService.CurrentUser == null)
@@ -143,7 +143,7 @@ else
         var result = await Database._dbConnection.QueryAsync<JournalEntry>(query, userId);
         entries = result.ToList();
     }
-
+    // Apply filters to entries
     private List<JournalEntry> FilteredEntries =>
         entries
             .Where(e =>

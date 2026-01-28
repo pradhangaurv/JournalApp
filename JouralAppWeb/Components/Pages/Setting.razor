@@ -213,7 +213,7 @@
         await Application.Current.MainPage.DisplayAlert(
             "Success", "Profile updated", "OK");
     }
-
+    // CHANGE PASSWORD
     private async Task ChangePassword()
     {
         if (!isLoggedIn) return;
@@ -281,7 +281,7 @@
         await ApplyTheme();
     }
 
-    // EXPORT PDF (ONLY THIS USER)
+    // EXPORT PDF per user and date range
     private async Task ExportPdf()
     {
         if (!isLoggedIn) return;
@@ -337,8 +337,8 @@
     // NAVIGATION
     private void Logout()
     {
-        AuthService.Logout();            // ✅ clear current session
-        Navigation.NavigateTo("/");      // ✅ no force reload
+        AuthService.Logout();        
+        Navigation.NavigateTo("/");      
     }
 
     private void GoBack()

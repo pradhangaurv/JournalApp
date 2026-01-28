@@ -147,7 +147,7 @@ else
 @code {
     private bool isLoggedIn = false;
     private int userId;
-
+    // Current displayed month and year
     private DateTime currentDate = DateTime.Today;
     private DateTime selectedDate = DateTime.MinValue;
 
@@ -165,6 +165,7 @@ else
     private int daysInMonth => DateTime.DaysInMonth(currentDate.Year, currentDate.Month);
     private int firstDayOfMonth => (int)new DateTime(currentDate.Year, currentDate.Month, 1).DayOfWeek;
 
+    // Load user journal entries on initialization
     protected override async Task OnInitializedAsync()
     {
         if (!AuthService.IsLoggedIn || AuthService.CurrentUser == null)
@@ -192,7 +193,7 @@ else
 
         CalculateStats();
     }
-
+    // Calculate statistics
     private void CalculateStats()
     {
         totalEntries = journalEntries.Count;
@@ -208,7 +209,7 @@ else
             .TakeWhile((d, i) => d == DateTime.Today.AddDays(-i))
             .Count();
     }
-
+    // View entries for a specific day
     private void ViewDayEntries(DateTime date)
     {
         selectedDate = date;
@@ -250,7 +251,7 @@ else
 
         CalculateStats();
     }
-
+    // Utility to strip HTML tags from content
     private static string StripHtml(string? html)
     {
         if (string.IsNullOrWhiteSpace(html)) return "";

@@ -11,21 +11,21 @@
         <EditForm Model="newUser" OnValidSubmit="RegisterUser">
             <DataAnnotationsValidator />
             <ValidationSummary class="text-danger" />
-
+            <!-- FullName -->
             <div class="form-group">
                 <label>Full Name</label>
                 <InputText class="form-control"
                            placeholder="Enter your full name"
                            @bind-Value="newUser.FullName" />
             </div>
-
+            <!-- Email -->
             <div class="form-group">
                 <label>Email</label>
                 <InputText class="form-control"
                            placeholder="Enter your email"
                            @bind-Value="newUser.Email" />
             </div>
-
+            <!-- Password -->
             <div class="form-group">
                 <label>Password</label>
                 <InputText type="password"
@@ -33,7 +33,7 @@
                            placeholder="Create a password"
                            @bind-Value="newUser.Password" />
             </div>
-
+            <!-- Conform Password -->
             <div class="form-group">
                 <label>Confirm Password</label>
                 <InputText type="password"
@@ -93,7 +93,7 @@
             result.Message,
             "OK");
 
-        // no force reload
+        // For redirect to login after registration
         Navigation.NavigateTo("/");
     }
 

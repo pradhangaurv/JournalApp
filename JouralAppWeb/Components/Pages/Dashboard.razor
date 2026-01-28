@@ -249,7 +249,7 @@ else
             Console.WriteLine($"Error loading dashboard: {ex.Message}");
         }
     }
-
+    // Calculate current streak of consecutive days with entries
     private void CalculateStreak()
     {
         if (!allEntries.Any()) return;
@@ -269,7 +269,7 @@ else
             currentDate = currentDate.AddDays(-1);
         }
     }
-
+    // Get average mood score for a list of entries
     private int GetAverageMoodScore(List<JournalEntry> entries)
     {
         if (!entries.Any()) return 0;
@@ -285,7 +285,7 @@ else
 
         return (int)Math.Round((double)totalScore / entries.Count);
     }
-
+    // Calculate SVG arc path for pie chart segment
     private string CalculateArc(double cx, double cy, double radius, double startAngle, double endAngle)
     {
         var startRad = (startAngle - 90) * Math.PI / 180;
@@ -299,7 +299,7 @@ else
         var largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
         return $"M {cx} {cy} L {x1} {y1} A {radius} {radius} 0 {largeArcFlag} 1 {x2} {y2} Z";
     }
-
+    // Get color code for a given mood
     private string GetMoodColor(string mood) => mood switch
     {
         "Happy" => "#4CAF50",
@@ -323,7 +323,7 @@ else
         1 => "#F44336",
         _ => "#E0E0E0"
     };
-
+    // Generate a text preview by stripping HTML tags
     private string GetPreview(string content)
     {
         if (string.IsNullOrEmpty(content)) return "No content";

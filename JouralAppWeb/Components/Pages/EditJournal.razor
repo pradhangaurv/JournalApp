@@ -125,7 +125,7 @@ else
         userId = AuthService.CurrentUser.Id;
         await LoadJournal();
     }
-
+    // Initialize Quill editor after first render
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender && entryObj != null && !quillReady)
@@ -135,7 +135,7 @@ else
             quillReady = true;
         }
     }
-
+    // Load the journal entry from the database
     private async Task LoadJournal()
     {
         var sql = "SELECT * FROM JournalEntries WHERE Id=? AND UserId=? LIMIT 1";
@@ -153,7 +153,7 @@ else
 
         isLoading = false;
     }
-
+    // Update the journal entry
     private async Task UpdateJournal()
     {
         if (entryObj == null) return;
@@ -202,7 +202,7 @@ else
         else
             SecondaryMoodList.Remove(mood);
     }
-
+    // Delete the journal entry
     private async Task DeleteEntry()
     {
         await Database._dbConnection.ExecuteAsync(

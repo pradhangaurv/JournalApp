@@ -233,7 +233,7 @@
             await Application.Current.MainPage.DisplayAlert("Error", $"Failed to save: {ex.Message}", "OK");
         }
     }
-
+    // Handle secondary mood selection
     private void ToggleSecondaryMood(string mood, bool selected)
     {
         if (selected)
